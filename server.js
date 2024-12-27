@@ -1,31 +1,21 @@
 const express = require('express')
 require('dotenv').config()
-const { runDockerAndSaveLogs } = require('./script')
 const connectDb = require('./db/db.config')
+const cors = require('cors')
+const verification = require('./middlewares/verification')
 const app = express()
 
 connectDb()
 app.use(express.json())
+app.use(cors())
 
 app.use('/user', require('./routes/user.routes'))
 app.use('/admin', require('./routes/admin.routes'))
+app.use('/script', require('./routes/script.routes'))
 
-app.post('/run-id', async (req, res) => {
-  const envData = req.body
-
-  if(!envData?.EMBASSY_ARRAY || !envData?.USERNAME || !envData?.PASSWORD || !envData?.SCHEDULE_ID || !envData?.PRIOD_END){
-    return res.json({message: 'fields are missing', success: false})
-  }
-
-  try {
-    await runDockerAndSaveLogs(envData)
-    res.status(200).json({ message: 'Script executed successfully.' })
-  } catch (error) {
-    console.error(`Error running script: ${error.message}`)
-    res
-      .status(500)
-      .json({ message: 'Error executing script.', error: error.message })
-  }
+app.get('/verify', verification, (req, res) => {
+  console.log({ req })
+  return res.json({ message: 'server is up', success: true })
 })
 
 const PORT = process.env.PORT

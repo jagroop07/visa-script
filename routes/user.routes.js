@@ -7,7 +7,7 @@ const userController = resources(userModel)
 userRouter.post("/", userController.list)
 userRouter.get("/:id", userController.single)
 userRouter.patch("/:id", userController.update)
-userRouter.post("/", userController.create)
+userRouter.post("/create", userController.create)
 
 
 

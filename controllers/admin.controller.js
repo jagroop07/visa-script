@@ -1,4 +1,5 @@
 const adminModel = require('../models/admin.model')
+const jwt = require('jsonwebtoken')
 
 const login = async (req, res) => {
   try {
@@ -12,18 +13,37 @@ const login = async (req, res) => {
 
     const admin = await adminModel.findOne({ email }).lean()
 
-    if(!admin){
-        return res.status(404).json({message: "admin not found", success: false})
+    if (!admin) {
+      return res
+        .status(404)
+        .json({ message: 'admin not found', success: false })
     }
 
-    if(admin.password != password){
-        return res.status(401).json({message: "wrong credentials", success: false})
+    if (admin.password != password) {
+      return res
+        .status(401)
+        .json({ message: 'wrong credentials', success: false })
     }
 
-    return res.status(200).json({message: "successfully login", success: true})
+    const token = jwt.sign({ id: admin._id }, process.env.SECRET_KEY, {
+      expiresIn: '2h'
+    })
+
+    return res
+      .status(200)
+      .json({ message: 'successfully login', token, success: true })
   } catch (error) {
     console.log(error.message)
   }
 }
 
-module.exports = login
+//register
+const register = async (req, res) => {
+  const data = req.body
+
+  await adminModel.create(data)
+
+  return res.json({ message: 'admin is registered' })
+}
+
+module.exports = { login, register }
