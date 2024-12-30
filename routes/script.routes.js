@@ -1,7 +1,15 @@
 const express = require('express')
-const { runscript } = require('../controllers/script.controller')
+const {
+  runscript,
+  stopscript,
+  restartscript,
+  getStatus
+} = require('../controllers/script.controller')
 const scriptRouter = express.Router()
 
-scriptRouter.post("/", runscript)
+scriptRouter.get('/run/:id', runscript)
+scriptRouter.get('/stop/:id', stopscript)
+scriptRouter.get('/restart/:id', restartscript)
+scriptRouter.get('/get-status/:id', getStatus)
 
 module.exports = scriptRouter
