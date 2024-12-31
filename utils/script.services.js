@@ -35,7 +35,7 @@ function filterCustomLogs (logEntry) {
   return logEntry.includes('prismaple')
 }
 
-async function logStreams (logFile, container, containerName) {
+async function logStreams (logFile, container, containerName, id) {
   const logStream = await container.logs({
     follow: true,
     stdout: true,
@@ -58,7 +58,7 @@ async function logStreams (logFile, container, containerName) {
         const slicedLog = sliceLog(logEntry)
         if (slicedLog) {
           console.log(slicedLog)
-          io.emit('file-update', slicedLog)
+          io.emit(`file-update${id}`, slicedLog)
           logFile.write(slicedLog + '\n')
         }
       }
@@ -83,7 +83,7 @@ async function logStreams (logFile, container, containerName) {
   }, 1000)
 }
 
-async function runDockerAndSaveLogs (envVars, onContainerStarted) {
+async function runDockerAndSaveLogs (envVars, id, onContainerStarted) {
   const dockerImage = 'testimage'
   const containerName = generateContainerName()
 
@@ -129,7 +129,7 @@ async function runDockerAndSaveLogs (envVars, onContainerStarted) {
 
     console.log(`Streaming custom logs from container '${containerName}'...`)
 
-    await logStreams(logFile, container, containerName)
+    await logStreams(logFile, container, containerName, id)
   } catch (error) {
     console.error(`Error managing Docker container: ${error.message}`)
   }

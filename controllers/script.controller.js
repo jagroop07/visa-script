@@ -27,19 +27,25 @@ const runscript = async (req, res) => {
       PRIOD_END: userEnv?.enddate
     }
 
-    await runDockerAndSaveLogs(envData, async (containerId, containerName) => {
-      await containerModel.create({
-        user_id: id,
-        containerId,
-        containerName,
-        running: true
-      })
-      return res.status(200).json({
-        message: 'Script executed successfully.',
-        success: true
-      })
-    })
+    await runDockerAndSaveLogs(
+      envData,
+      id,
+      async (containerId, containerName) => {
+        await containerModel.create({
+          user_id: id,
+          containerId,
+          containerName
+        })
+
+        await userModel.findOneAndUpdate({ _id: id }, { status: 'Running' })
+        return res.status(200).json({
+          message: 'Script executed successfully.',
+          success: true
+        })
+      }
+    )
   } catch (error) {
+    await userModel.findOneAndUpdate({ _id: id }, { status: 'Errored' })
     res.status(500).json({
       message: error.message || 'Error executing script.',
       success: false
@@ -72,13 +78,14 @@ const stopscript = async (req, res) => {
         .json({ message: 'Error stopping container.', success: false })
     }
 
-    await containerModel.findOneAndUpdate({ user_id: id }, { running: false })
+    await userModel.findOneAndUpdate({ _id: id }, { status: 'Idle' })
 
     return res.status(200).json({
       message: `container stopped with container ID: ${containerId}`,
       success: true
     })
   } catch (error) {
+    await userModel.findOneAndUpdate({ _id: id }, { status: 'Errored' })
     return res.status(500).json({
       message: error.message || 'Error stopping script.',
       success: false
@@ -115,47 +122,17 @@ const restartscript = async (req, res) => {
         .json({ message: 'Error restarted container.', success: false })
     }
 
-    await containerModel.findOneAndUpdate({ user_id: id }, { running: true })
+    await userModel.findOneAndUpdate({ _id: id }, { status: 'Running' })
 
-    await logStreams(logFile, container, containerName)
+    await logStreams(logFile, container, containerName, id)
     return res.status(200).json({
       message: `container restarted with container ID: ${containerId}`,
       success: true
     })
   } catch (error) {
+    await userModel.findOneAndUpdate({ _id: id }, { status: 'Errored' })
     return res.status(500).json({
       message: error.message || 'Error restarting script.',
-      success: false
-    })
-  }
-}
-
-const getStatus = async (req, res) => {
-  try {
-    const { id } = req.params
-
-    if (!id) {
-      return res.status(404).json({ message: 'Id is missing', success: false })
-    }
-
-    const containerInfo = await containerModel
-      .findOne({ user_id: id })
-      .sort({ _id: -1 })
-
-    if (!containerInfo) {
-      return res
-        .status(404)
-        .json({ message: 'no container info found', success: false })
-    }
-
-    return res.status(200).json({
-      message: 'success',
-      success: true,
-      details: containerInfo.running
-    })
-  } catch (error) {
-    return res.status(500).json({
-      message: error.message || 'something went wrong',
       success: false
     })
   }
@@ -164,6 +141,5 @@ const getStatus = async (req, res) => {
 module.exports = {
   runscript,
   stopscript,
-  restartscript,
-  getStatus
+  restartscript
 }

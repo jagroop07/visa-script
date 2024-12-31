@@ -35,7 +35,6 @@ app.use('/admin', require('./routes/admin.routes'))
 app.use('/script', require('./routes/script.routes'))
 
 app.get('/verify', verification, (req, res) => {
-  console.log({ req })
   return res.json({ message: 'server is up', success: true })
 })
 

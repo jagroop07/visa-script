@@ -6,8 +6,7 @@ const containerSchema = new mongoose.Schema({
     ref: 'user'
   },
   containerName: String,
-  containerId: String,
-  running: Boolean
+  containerId: String
 })
 
 module.exports = mongoose.model('container', containerSchema)
