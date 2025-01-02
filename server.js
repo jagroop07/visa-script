@@ -1,13 +1,12 @@
 const express = require('express')
 require('dotenv').config()
 const http = require('http')
+const { spawn } = require('child_process')
+const { Writable } = require('stream')
 const connectDb = require('./db/db.config')
 const cors = require('cors')
-const path = require('path')
-const fs = require('fs')
 const socketIo = require('socket.io')
 const verification = require('./middlewares/verification')
-const containerModel = require('./models/container.model')
 const app = express()
 const server = http.createServer(app)
 const io = socketIo(server, {
@@ -38,45 +37,53 @@ app.get('/verify', verification, (req, res) => {
   return res.json({ message: 'server is up', success: true })
 })
 
-// const getLogfile = async id => {
-//   const containerColl = await containerModel.findOne({ user_id: id })
-//   return `${containerColl?.containerName}_custom_logs.txt`
-// }
+const logStream = fs.createWriteStream(
+  path.join(__dirname, 'process_logs.txt'),
+  { flags: 'a' }
+)
 
-io.on('connection', socket => {
-  console.log('Client connected via Socket.IO')
+const socketStream = new Writable({
+  write (chunk, encoding, callback) {
+    const logMessage = chunk.toString()
+    io.emit('process-log', { type: 'stdout', message: logMessage })
+    callback()
+  }
+})
 
-  const id = socket.handshake.query.id
+app.post('/spawn-process', (req, res) => {
+  const { command, args, env } = req.body
 
-  if (!id) {
-    socket.emit('file-update', 'Invalid Id')
-    socket.disconnect()
-    return
+  if (!command) {
+    return res.status(400).json({ error: 'Command is required' })
   }
 
-  // getLogfile(id)
-  //   .then(logFile => {
-  //     const logFilePath = path.join(__dirname, logFile)
+  const childEnv = { ...process.env, ...env }
 
-  //     const sendFileContent = () => {
-  //       if (fs.existsSync(logFilePath)) {
-  //         const content = fs.readFileSync(logFilePath, 'utf-8')
-  //         socket.emit('file-update', content)
-  //       } else {
-  //         socket.emit('file-update', 'Log file not found')
-  //       }
-  //     }
+  const child = spawn(command, args || [], { env: childEnv })
 
-  //     sendFileContent()
+  child.stdout.pipe(logStream)
+  child.stdout.pipe(socketStream)
 
-  //     socket.on('disconnect', () => {
-  //       console.log('Client disconnected')
-  //     })
-  //   })
-  //   .catch(err => {
-  //     socket.emit('file-update', 'Error fetching log file: ' + err.message)
-  //     socket.disconnect()
-  //   })
+  child.stderr.pipe(logStream)
+  child.stderr.pipe(socketStream)
+
+  child.on('close', code => {
+    const message = `Process exited with code ${code}`
+    console.log(message)
+
+    fs.appendFileSync(
+      path.join(__dirname, 'process_logs.txt'),
+      `CLOSE: ${message}\n`
+    )
+
+    io.emit('process-log', { type: 'close', message })
+  })
+
+  res.json({ message: 'Process spawned', pid: child.pid })
+})
+
+io.on('connection', socket => {
+  console.log('Frontend connected via Socket.IO')
 })
 
 const PORT = process.env.PORT
